@@ -4,11 +4,11 @@ module ConeProj
 include("QRupdate.jl")
 
 using LinearAlgebra
-export coneB, coneBEq, solvex, solvexeq
+export nnls, ecnnls, solvex, solvexeq
 
 # there is some way to switch to views here which may speed things up
 
-function coneB(A, b; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit=nothing)
+function nnls(A, b; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit=nothing)
     optimal = true
     n, = size(b)
     _, m = size(A)
@@ -78,7 +78,7 @@ function coneB(A, b; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit=nothin
     return(coefs, passive_set, R, optimal)
 end
 
-function coneBEq(A, b, C, d; p=0, passive_set=nothing, R=nothing, constraint_set=nothing, tol=1e-8, maxit=nothing)
+function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, constraint_set=nothing, tol=1e-8, maxit=nothing)
     optimal = true
     n, = size(b)
     q = size(d)
@@ -129,7 +129,7 @@ function coneBEq(A, b, C, d; p=0, passive_set=nothing, R=nothing, constraint_set
         # _, r = qr(A)
         # Cp = (pinv(r) * C')'
         # print(size(Cp))
-        # _, constraint_set, _, _ = coneB(Cp, d, p=p)
+        # _, constraint_set, _, _ = nnls(Cp, d, p=p)
         # print(size(constraint_set))
         # passive_set = union(1:p, constraint_set)
         # _, R = qr(A[:, passive_set])
