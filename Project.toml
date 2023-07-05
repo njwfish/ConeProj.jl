@@ -1,7 +1,7 @@
 name = "ConeProj"
 uuid = "57e5918e-c4e5-47a8-bf19-0d608e0bd369"
 authors = ["Nic Fishman"]
-version = "1.0.0-DEV"
+version = "0.1.0"
 
 [deps]
 Convex = "f65535da-76fb-5f13-bab9-19810c17039a"
