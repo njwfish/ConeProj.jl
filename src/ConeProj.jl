@@ -95,30 +95,24 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, constraint_set=
     lambd = zeros(q)
 
 
-    if (passive_set == nothing) | (R == nothing) 
-        if  constraint_set != nothing
-            passive_set = union(1:p, constraint_set)
+    if (passive_set == nothing) | (R == nothing)
+        if p == 0
+            passive_set = Vector{Int}()
+            R = zeros(0, 0)
         else
             passive_set = Vector(1:p)
+            _, R = qr(A[:, passive_set])
+            coefs[passive_set] = solvex(R, A[:, passive_set], b)
+            bhat = A[:, passive_set] * coefs[passive_set]
         end
-        _, R = qr(A[:, passive_set])
-    end
-
-    if constraint_set != nothing
+    else
         coefs[passive_set], lambd = solvexeq(R, A[:, passive_set], b, C[:, passive_set], d)
-        bhat = A[:, passive_set] * coefs[passive_set]
-    else 
-        coefs[passive_set] = solvex(R, A[:, passive_set], b)
         bhat = A[:, passive_set] * coefs[passive_set]
     end
 
     # compute projected residual
     proj_resid = (A' * (b - bhat) + C' * lambd) / n
-    if constraint_set != nothing
-        if maximum(proj_resid) <= (2 * tol)
-            return(bhat, coefs, passive_set, R)
-        end
-    else 
+    if all(lambd .== 0)
         feasible_constraint_set = findall(vec(C) .> 0)
         max_ind = feasible_constraint_set[
             partialsortperm(proj_resid[feasible_constraint_set], 1, rev=true)
@@ -133,6 +127,10 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, constraint_set=
         # print(size(constraint_set))
         # passive_set = union(1:p, constraint_set)
         # _, R = qr(A[:, passive_set])
+    else
+        if maximum(proj_resid) <= (2 * tol)
+            return(bhat, coefs, passive_set, R)
+        end
     end
     coefs[passive_set] .= 0
 
