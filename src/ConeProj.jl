@@ -78,7 +78,7 @@ function nnls(A, b; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit=nothing
     return(coefs, passive_set, R, optimal)
 end
 
-function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, constraint_set=nothing, tol=1e-8, maxit=nothing)
+function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit=nothing)
     optimal = true
     n, = size(b)
     q = size(d)
