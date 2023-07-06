@@ -39,7 +39,7 @@ function nnls(A, b; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit=nothing
     proj_resid = A' * (b - bhat) / n
     max_ind = partialsortperm(proj_resid, 1, rev=true)
     if proj_resid[max_ind] <= 2 * tol
-        return(coefs, passive_set, R, optimal)
+        @goto done
     end
     coefs[passive_set] .= 0
     
@@ -129,7 +129,7 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit
         # _, R = qr(A[:, passive_set])
     else
         if maximum(proj_resid) <= (2 * tol)
-            return(bhat, coefs, passive_set, R)
+            @goto done
         end
     end
     coefs[passive_set] .= 0
