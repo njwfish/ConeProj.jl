@@ -78,6 +78,7 @@ function nnls(A, b; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit=nothing
     return(coefs, passive_set, R, optimal)
 end
 
+#TODO #3 Investiage the issue even with the 1D case where we end up with negative coefficients 
 function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit=nothing)
     optimal = true
     n, = size(b)
