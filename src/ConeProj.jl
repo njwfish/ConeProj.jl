@@ -129,6 +129,7 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit
         # passive_set = union(1:p, constraint_set)
         # _, R = qr(A[:, passive_set])
     else
+        println("returning at start", sort(coefs[passive_set]))
         min_ind = p + partialsortperm(coefs[passive_set][p+1:end], 1, rev=false)
         if coefs[passive_set][min_ind] < -tol 
             coefs[min_ind] = 0
