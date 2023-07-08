@@ -148,7 +148,7 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit
         coef_passive, lambd = solvexeq(R, A_passive, b, C[:, passive_set], d)
         if length(coef_passive) > p
             min_ind = p + partialsortperm(coef_passive[p+1:end], 1, rev=false)
-            println("min_ind", min_ind, " ", coef_passive[min_ind])
+            println("min_ind", min_ind, " ", coef_passive[min_ind], " ", sort(coef_passive))
             if coef_passive[min_ind] < -tol 
                 R = qrdelcol(R, min_ind)
                 deleteat!(passive_set, min_ind)
