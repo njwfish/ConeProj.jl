@@ -133,7 +133,7 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit
         if coef_passive[min_ind] < -tol 
             R = qrdelcol(R, min_ind)
             deleteat!(passive_set, min_ind)
-        else if maximum(proj_resid) <= (2 * tol)
+        elseif maximum(proj_resid) <= (2 * tol)
             @goto done
         end
     end
