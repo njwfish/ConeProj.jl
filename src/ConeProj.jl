@@ -69,13 +69,15 @@ function nnls(A, b; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit=nothing
             end
         else 
             coefs[passive_set] = coef_passive
+            bhat = A[:, passive_set] * coefs[passive_set]
             @goto done
         end
     end
     coefs[passive_set] = solvex(R, A[:, passive_set], b)
+    bhat = A[:, passive_set] * coefs[passive_set]
     optimal = false
     @label done
-    return(coefs, passive_set, R, optimal)
+    return(coefs, bhat, passive_set, R, optimal)
 end
 
 #TODO #3 Investiage the issue even with the 1D case where we end up with negative coefficients 
@@ -164,13 +166,15 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit
             end
         else 
             coefs[passive_set] = coef_passive
+            bhat = A[:, passive_set] * coefs[passive_set]
             @goto done
         end
     end
     coefs[passive_set], lambd = solvexeq(R, A[:, passive_set], b, C[:, passive_set], d)
+    bhat = A[:, passive_set] * coefs[passive_set]
     optimal = false
     @label done
-    return(coefs, passive_set, R, optimal)
+    return(coefs, bhat, passive_set, R, optimal)
 end
 
 end
