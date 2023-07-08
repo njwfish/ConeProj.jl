@@ -129,8 +129,9 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit
         # passive_set = union(1:p, constraint_set)
         # _, R = qr(A[:, passive_set])
     else
-        min_ind = p + partialsortperm(coef_passive[p+1:end], 1, rev=false)
-        if coef_passive[min_ind] < -tol 
+        min_ind = p + partialsortperm(coefs[passive_set][p+1:end], 1, rev=false)
+        if coefs[passive_set][min_ind] < -tol 
+            coefs[min_ind] = 0
             R = qrdelcol(R, min_ind)
             deleteat!(passive_set, min_ind)
         elseif maximum(proj_resid) <= (2 * tol)
