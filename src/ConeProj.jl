@@ -45,7 +45,6 @@ function nnls(A, b; p=0, passive_set=nothing, uqr=nothing, tol=1e-8, maxit=nothi
     if length(passive_set) == p
         push!(passive_set, max_ind)
         if (p == 0) & (uqr === nothing)
-            passive_set = Vector{Int}()
             uqr = UpdatableQR(A[:, passive_set])
         else
             add_column!(uqr, A[:, max_ind])
@@ -105,15 +104,14 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, uqr=nothing, tol=1e-8, max
     if (passive_set == nothing) | (uqr == nothing)
         if p == 0
             passive_set = Vector{Int}()
-            uqr = UpdatableQR(0)
         else
             passive_set = Vector(1:p)
             uqr = UpdatableQR(A[:, passive_set])
-            coefs[passive_set], lambd = solvexeq(uqr.R, A[:, passive_set], b, C[:, passive_set], d)
+            coefs[passive_set] = solvex(uqr.R1, A[:, passive_set], b)
             bhat = A[:, passive_set] * coefs[passive_set]
         end
     else
-        coefs[passive_set], lambd = solvexeq(uqr, A[:, passive_set], b, C[:, passive_set], d)
+        coefs[passive_set], lambd = solvexeq(uqr.R1, A[:, passive_set], b, C[:, passive_set], d)
         bhat = A[:, passive_set] * coefs[passive_set]
     end
 
@@ -124,9 +122,13 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, uqr=nothing, tol=1e-8, max
         max_ind = feasible_constraint_set[
             partialsortperm(proj_resid[feasible_constraint_set], 1, rev=true)
         ]
-        constraint_set = [max_ind]
-        uqr = qraddcol(A[:, passive_set], uqr, A[:, max_ind])
+        # constraint_set = [max_ind]
         push!(passive_set, max_ind)
+        if (p == 0) & (uqr === nothing)
+            uqr = UpdatableQR(A[:, passive_set])
+        else
+            add_column!(uqr, A[:, max_ind])
+        end
         # _, r = qr(A)
         # Cp = (pinv(r) * C')'
         # print(size(Cp))
@@ -139,7 +141,7 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, uqr=nothing, tol=1e-8, max
         if coefs[passive_set][min_ind] < -tol 
             # println("removing at start", sort(coefs[passive_set]))
             coefs[passive_set[min_ind]] = 0
-            uqr = qrdelcol(uqr, min_ind)
+            remove_column!(uqr, min_ind)
             deleteat!(passive_set, min_ind)
         elseif maximum(proj_resid) <= (2 * tol)
             # println("returning at start", sort(coefs[passive_set]))
@@ -150,12 +152,12 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, uqr=nothing, tol=1e-8, max
 
     for it in 1:maxit
         A_passive = A[:, passive_set]
-        coef_passive, lambd = solvexeq(uqr, A_passive, b, C[:, passive_set], d)
+        coef_passive, lambd = solvexeq(uqr.R1, A_passive, b, C[:, passive_set], d)
         if length(coef_passive) > p
             min_ind = p + partialsortperm(coef_passive[p+1:end], 1, rev=false)
             # println("min_ind", min_ind, " ", coef_passive[min_ind], " ", sort(coef_passive))
             if coef_passive[min_ind] < -tol 
-                uqr = qrdelcol(uqr, min_ind)
+                remove_column!(uqr, min_ind)
                 deleteat!(passive_set, min_ind)
             else
                 bhat = A_passive * coef_passive
@@ -165,7 +167,7 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, uqr=nothing, tol=1e-8, max
                     coefs[passive_set] = coef_passive
                     @goto done
                 end
-                uqr = qraddcol(A_passive, uqr, A[:, max_ind])
+                add_column!(uqr, A[:, max_ind])
                 push!(passive_set, max_ind)
             end
         else 
@@ -174,7 +176,7 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, uqr=nothing, tol=1e-8, max
             @goto done
         end
     end
-    coefs[passive_set], lambd = solvexeq(uqr, A[:, passive_set], b, C[:, passive_set], d)
+    coefs[passive_set], lambd = solvexeq(uqr.R1, A[:, passive_set], b, C[:, passive_set], d)
     bhat = A[:, passive_set] * coefs[passive_set]
     optimal = false
     @label done
