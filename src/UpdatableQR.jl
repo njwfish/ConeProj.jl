@@ -1,5 +1,3 @@
-using LinearAlgebra
-
 mutable struct UpdatableQR{T} <: Factorization{T}
     """
     Gives the qr factorization an (n, m) matrix as Q1*R1
@@ -28,10 +26,11 @@ mutable struct UpdatableQR{T} <: Factorization{T}
             UpperTriangular(view(R, 1:m, 1:m)))
     end
 
-end
-
-function add_column!(F::Nothing, a::AbstractVector{T}) where {T}
-    return UpdatableQR(reshape(a, length(a), 1))
+    function Base.copy(F::UpdatableQR{T}) where {T}
+        new{T}(copy(F.Q), copy(F.R), F.n, F.m,
+            view(F.Q, :, 1:F.m), view(F.Q, :, F.m+1:F.n),
+            UpperTriangular(view(F.R, 1:F.m, 1:F.m)))
+    end
 end
 
 function add_column!(F::UpdatableQR{T}, a::AbstractVector{T}) where {T}
@@ -90,96 +89,4 @@ function update_views!(F::UpdatableQR{T}) where {T}
     F.R1 = UpperTriangular(view(F.R, 1:F.m, 1:F.m))
     F.Q1 = view(F.Q, :, 1:F.m)
     F.Q2 = view(F.Q, :, F.m+1:F.n)
-end
-
-
-"""
-Same as csne but only for x
-"""
-function solvex(Rin::AbstractMatrix{T}, A::AbstractMatrix{T}, b::Vector{T}) where {T}
-    R = UpperTriangular(Rin)
-    q = A' * b
-    x = R' \ q
-    x = R \ x
-    return x
-end
-
-"""
-Solve the corrected semi-normal equations `R'Rx=A'b`.
-
-    x, r = csne(R, A, b) solves the least-squares problem
-
-minimize  ||r||_2,  where  r := b - A*x
-
-using the corrected semi-normal equation approach described by
-Bjork (1987). Assumes that `R` is upper triangular.
-"""
-function csne(Rin::AbstractMatrix{T}, A::AbstractMatrix{T}, b::Vector{T}) where {T}
-
-    R = UpperTriangular(Rin)
-    q = A'*b
-    x = R' \ q
-
-    bnorm2 = sum(b.^2)
-    xnorm2 = sum(x.^2)
-    d2 = bnorm2 - xnorm2
-
-    x = R \ x
-
-    # Apply one step of iterative refinement.
-    r = b - A*x
-    q = A'*r
-    dx = R' \ q
-    dx = R  \ dx
-    x += dx
-    r = b - A*x
-    return (x, r)
-end
-
-function solvexeq(
-    Rin::AbstractMatrix{T}, A::AbstractMatrix{T}, b::Vector{T}, C::AbstractMatrix{T}, d::Vector{T}
-)  where {T}
-    x = solvex(Rin, A, b)
-    R = UpperTriangular(Rin)
-    M = C / R
-    _, U = qr(M')
-    y = U' \ (d - C * x)
-    y = U \ y
-    z = R' \ (C' * y)
-    z = R \ z
-    x = x + z
-    return x, y
-end
-
-# TODO: There should be a more efficient implementation of this. Empirically when we add a row/col
-# to R that just adds a col to C, leaving the rest unchanged. There should be some way to compute this.
-# If we can cheaply compute that additional column then we can keep a qless factorization of M' below by
-# using the addrow functions above. I believe this will be faster than the full qr decomposition each time.
-function solvexeq(
-    Rin::AbstractMatrix{T}, A::AbstractMatrix{T}, b::Vector{T}, C::AbstractMatrix{T}, d::AbstractMatrix{T}
-)  where {T}
-    x = solvex(Rin, A, b)
-    R = UpperTriangular(Rin)
-    M = C / R
-    _, U = qr(M')
-    y = U' \ (d - C * x)
-    y = U \ y
-    z = R' \ (C' * y)
-    z = R \ z
-    x = x + z
-    return x, y
-end
-
-function solvexeq(
-    Rin::AbstractMatrix{T}, A::AbstractMatrix{T}, b::Vector{T}, Uin::AbstractMatrix{T}, C::AbstractMatrix{T}, d::AbstractMatrix{T}
-)  where {T}
-    x = solvex(Rin, A, b)
-    R = UpperTriangular(Rin)
-    U = UpperTriangular(Uin)
-    y = U' \ (d - C * x)
-    y = U \ y
-    z = R' \ (C' * y)
-    z = R \ z
-    x = x + z
-    return x, y
 end
