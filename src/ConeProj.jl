@@ -1,14 +1,14 @@
 module ConeProj
 
 
-include("QRupdate.jl")
+include("UpdatableQR.jl")
 
 using LinearAlgebra
 export nnls, ecnnls, solvex, solvexeq
 
 # there is some way to switch to views here which may speed things up
 
-function nnls(A, b; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit=nothing)
+function nnls(A, b; p=0, passive_set=nothing, uqr=nothing, tol=1e-8, maxit=nothing)
     optimal = true
     n, = size(b)
     _, m = size(A)
@@ -21,18 +21,17 @@ function nnls(A, b; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit=nothing
     bhat = zeros(n)
     coefs = zeros(m + p)
 
-    if (passive_set == nothing) | (R == nothing)
+    if (passive_set === nothing) | (uqr === nothing)
         if p == 0
             passive_set = Vector{Int}()
-            R = zeros(0, 0)
         else
             passive_set = Vector(1:p)
-            _, R = qr(A[:, passive_set])
+            uqr = UpdatableQR(A[:, passive_set])
         end
     end
 
     if length(passive_set) > 0
-        coefs[passive_set] = solvex(R, A[:, passive_set], b)
+        coefs[passive_set] = solvex(uqr.R1, A[:, passive_set], b)
         bhat = A[:, passive_set] * coefs[passive_set]
     end
 
@@ -44,17 +43,22 @@ function nnls(A, b; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit=nothing
     coefs[passive_set] .= 0
     
     if length(passive_set) == p
-        R = qraddcol(A[:, passive_set], R, A[:, max_ind])
         push!(passive_set, max_ind)
+        if (p == 0) & (uqr === nothing)
+            passive_set = Vector{Int}()
+            uqr = UpdatableQR(A[:, passive_set])
+        else
+            add_column!(uqr, A[:, max_ind])
+        end
     end
 
     for i in 1:maxit
-        A_passive = A[:, passive_set]
-        coef_passive = solvex(R, A_passive, b)
+        A_passive = view(A, :, passive_set)
+        coef_passive = solvex(uqr.R1, A_passive, b)
         if length(coef_passive) > p
             min_ind = p + partialsortperm(coef_passive[p+1:end], 1, rev=false)
             if coef_passive[min_ind] < -tol             
-                R = qrdelcol(R, min_ind)
+                remove_column!(uqr, min_ind)
                 deleteat!(passive_set, min_ind)
             else
                 bhat = A_passive * coef_passive
@@ -64,7 +68,7 @@ function nnls(A, b; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit=nothing
                     coefs[passive_set] = coef_passive
                     @goto done
                 end
-                R = qraddcol(A_passive, R, A[:, max_ind])
+                add_column!(uqr, A[:, max_ind])
                 push!(passive_set, max_ind)
             end
         else 
@@ -73,15 +77,15 @@ function nnls(A, b; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit=nothing
             @goto done
         end
     end
-    coefs[passive_set] = solvex(R, A[:, passive_set], b)
+    coefs[passive_set] = solvex(uqr.R1, A[:, passive_set], b)
     bhat = A[:, passive_set] * coefs[passive_set]
     optimal = false
     @label done
-    return(coefs, bhat, passive_set, R, optimal)
+    return(coefs, bhat, passive_set, uqr, optimal)
 end
 
 #TODO #3 Investiage the issue even with the 1D case where we end up with negative coefficients 
-function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit=nothing)
+function ecnnls(A, b, C, d; p=0, passive_set=nothing, uqr=nothing, tol=1e-8, maxit=nothing)
     optimal = true
     n, = size(b)
     q = size(d)
@@ -98,18 +102,18 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit
     lambd = zeros(q)
 
 
-    if (passive_set == nothing) | (R == nothing)
+    if (passive_set == nothing) | (uqr == nothing)
         if p == 0
             passive_set = Vector{Int}()
-            R = zeros(0, 0)
+            uqr = UpdatableQR(0)
         else
             passive_set = Vector(1:p)
-            _, R = qr(A[:, passive_set])
-            coefs[passive_set] = solvex(R, A[:, passive_set], b)
+            uqr = UpdatableQR(A[:, passive_set])
+            coefs[passive_set], lambd = solvexeq(uqr.R, A[:, passive_set], b, C[:, passive_set], d)
             bhat = A[:, passive_set] * coefs[passive_set]
         end
     else
-        coefs[passive_set], lambd = solvexeq(R, A[:, passive_set], b, C[:, passive_set], d)
+        coefs[passive_set], lambd = solvexeq(uqr, A[:, passive_set], b, C[:, passive_set], d)
         bhat = A[:, passive_set] * coefs[passive_set]
     end
 
@@ -121,7 +125,7 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit
             partialsortperm(proj_resid[feasible_constraint_set], 1, rev=true)
         ]
         constraint_set = [max_ind]
-        R = qraddcol(A[:, passive_set], R, A[:, max_ind])
+        uqr = qraddcol(A[:, passive_set], uqr, A[:, max_ind])
         push!(passive_set, max_ind)
         # _, r = qr(A)
         # Cp = (pinv(r) * C')'
@@ -135,7 +139,7 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit
         if coefs[passive_set][min_ind] < -tol 
             # println("removing at start", sort(coefs[passive_set]))
             coefs[passive_set[min_ind]] = 0
-            R = qrdelcol(R, min_ind)
+            uqr = qrdelcol(uqr, min_ind)
             deleteat!(passive_set, min_ind)
         elseif maximum(proj_resid) <= (2 * tol)
             # println("returning at start", sort(coefs[passive_set]))
@@ -146,12 +150,12 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit
 
     for it in 1:maxit
         A_passive = A[:, passive_set]
-        coef_passive, lambd = solvexeq(R, A_passive, b, C[:, passive_set], d)
+        coef_passive, lambd = solvexeq(uqr, A_passive, b, C[:, passive_set], d)
         if length(coef_passive) > p
             min_ind = p + partialsortperm(coef_passive[p+1:end], 1, rev=false)
             # println("min_ind", min_ind, " ", coef_passive[min_ind], " ", sort(coef_passive))
             if coef_passive[min_ind] < -tol 
-                R = qrdelcol(R, min_ind)
+                uqr = qrdelcol(uqr, min_ind)
                 deleteat!(passive_set, min_ind)
             else
                 bhat = A_passive * coef_passive
@@ -161,7 +165,7 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit
                     coefs[passive_set] = coef_passive
                     @goto done
                 end
-                R = qraddcol(A_passive, R, A[:, max_ind])
+                uqr = qraddcol(A_passive, uqr, A[:, max_ind])
                 push!(passive_set, max_ind)
             end
         else 
@@ -170,11 +174,11 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, R=nothing, tol=1e-8, maxit
             @goto done
         end
     end
-    coefs[passive_set], lambd = solvexeq(R, A[:, passive_set], b, C[:, passive_set], d)
+    coefs[passive_set], lambd = solvexeq(uqr, A[:, passive_set], b, C[:, passive_set], d)
     bhat = A[:, passive_set] * coefs[passive_set]
     optimal = false
     @label done
-    return(coefs, bhat, passive_set, R, optimal)
+    return(coefs, bhat, passive_set, uqr, optimal)
 end
 
 end

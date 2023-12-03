@@ -17,7 +17,7 @@ end
     A, b, C, d = sim(rng);
 
     # nn constrained p = 0
-    coefs, bhat, passive_set, R, status = nnls(A, b);
+    coefs, bhat, passive_set, uqr, status = nnls(A, b);
     @test status == 1
     _, r = qr(A[:, passive_set])
     _coefs = solvex(r, A[:, passive_set], b)
