@@ -3,7 +3,7 @@ using Random
 using LinearAlgebra
 using Test
 
-function sim(rng, n=100, p=100, k=1)
+function sim_nnls(rng, n=100, p=100, k=1)
     A = rand(rng, n, p)
     b = rand(rng, n)
     C = rand(rng, k, p)
@@ -12,8 +12,17 @@ function sim(rng, n=100, p=100, k=1)
     return(A, b, C, d)
 end
 
+function sim_nmf(rng, n=100, p=100, k=5)
+    A = rand(rng, k, p)
+    W = rand(rng, n, k)
+    W = W ./ sum(W, dims=2)
+    D = W * A + 0.1 * randn(rng, n, p)
+    A_n = abs.(A + 0.1 * randn(rng, k, p))
+    return(A, W, D, A_n)
+end
+
 @testset "ConeProj.jl" begin
-    rng = MersenneTwister(3);
+    rng = MersenneTwister(4);
     A, b, C, d = sim(rng);
 
     # nn constrained p = 0

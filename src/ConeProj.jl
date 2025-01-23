@@ -5,7 +5,7 @@ include("QRupdate.jl")
 include("UpdatableQR.jl")
 
 using LinearAlgebra
-export nnls, ecnnls, solvex, solvexeq
+export nnls, ecnnls, solvex, solvexeq, mat_nnls, mat_ecnnls, nmf, UpdatableQR
 
 # there is some way to switch to views here which may speed things up
 
@@ -22,7 +22,7 @@ function nnls(A, b; p=0, passive_set=nothing, uqr=nothing, tol=1e-8, maxit=nothi
     bhat = zeros(n)
     coefs = zeros(m + p)
 
-    if (passive_set == nothing) | (uqr == nothing)
+    if (passive_set == nothing) 
         if p == 0
             passive_set = Vector{Int}()
             uqr = nothing
@@ -30,6 +30,8 @@ function nnls(A, b; p=0, passive_set=nothing, uqr=nothing, tol=1e-8, maxit=nothi
             passive_set = Vector(1:p)
             uqr = UpdatableQR(A[:, passive_set])
         end
+    elseif (uqr == nothing)
+        uqr = UpdatableQR(A[:, passive_set])
     end
 
     if length(passive_set) > 0
@@ -40,6 +42,7 @@ function nnls(A, b; p=0, passive_set=nothing, uqr=nothing, tol=1e-8, maxit=nothi
     proj_resid = A' * (b - bhat) / n
     max_ind = partialsortperm(proj_resid, 1, rev=true)
     if proj_resid[max_ind] <= 2 * tol
+        print("done without changing passive set")
         @goto done
     end
     coefs[passive_set] .= 0
@@ -103,7 +106,7 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, uqr=nothing, tol=1e-8, max
     lambd = zeros(q)
 
 
-    if (passive_set == nothing) | (uqr == nothing)
+    if (passive_set == nothing) 
         if p == 0
             passive_set = Vector{Int}()
             uqr = nothing
@@ -114,6 +117,9 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, uqr=nothing, tol=1e-8, max
             bhat = A[:, passive_set] * coefs[passive_set]
         end
     else
+        if (uqr == nothing)
+            uqr = UpdatableQR(A[:, passive_set])
+        end
         coefs[passive_set], lambd = solvexeq(uqr.R1, A[:, passive_set], b, C[:, passive_set], d)
         bhat = A[:, passive_set] * coefs[passive_set]
     end
@@ -157,10 +163,10 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, uqr=nothing, tol=1e-8, max
         A_passive = A[:, passive_set]
         coef_passive, lambd = solvexeq(uqr.R1, A_passive, b, C[:, passive_set], d)
         if debug
-            println("iter: ", it)
-            println("\tpassive_set: ", passive_set)
-            println("\tcoefs: ", coef_passive)
-            println("\tlambd: ", lambd)
+            println("iter: $it")
+            println("\tpassive_set: $passive_set")
+            println("\tcoefs: $coef_passive")
+            println("\tlambd: $lambd")
             
         end
         if length(coef_passive) > p
@@ -174,7 +180,7 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, uqr=nothing, tol=1e-8, max
                 proj_resid = (A' * (b - bhat) + C' * lambd) / n
                 max_ind = partialsortperm(proj_resid, 1, rev=true)
                 if debug_proj
-                    println("\tproj_resid: ", proj_resid[max_ind], " ", proj_resid)
+                    println("\tproj_resid: $proj_resid[$max_ind] $proj_resid")
                 end
                 if proj_resid[max_ind] < 2 * tol
                     coefs[passive_set] = coef_passive
