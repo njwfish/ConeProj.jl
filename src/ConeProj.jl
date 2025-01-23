@@ -1,7 +1,7 @@
 module ConeProj
 
 
-include("QRupdate.jl")
+include("SolveQR.jl")
 include("UpdatableQR.jl")
 
 using LinearAlgebra
@@ -138,13 +138,6 @@ function ecnnls(A, b, C, d; p=0, passive_set=nothing, uqr=nothing, tol=1e-8, max
             add_column!(uqr, A[:, max_ind])
         end
         push!(passive_set, max_ind)
-        # _, r = qr(A)
-        # Cp = (pinv(r) * C')'
-        # print(size(Cp))
-        # _, constraint_set, _, _ = nnls(Cp, d, p=p)
-        # print(size(constraint_set))
-        # passive_set = union(1:p, constraint_set)
-        # _, R = qr(A[:, passive_set])
     else
         min_ind = p + partialsortperm(coefs[passive_set][p+1:end], 1, rev=false)
         if coefs[passive_set][min_ind] < -tol 
