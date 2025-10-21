@@ -3,9 +3,12 @@ module ConeProj
 
 include("SolveQR.jl")
 include("UpdatableQR.jl")
+include("NMF.jl")
+include("TruncatedNormal.jl")
 
 using LinearAlgebra
 export nnls, ecnnls, solvex, solvexeq, mat_nnls, mat_ecnnls, nmf, UpdatableQR
+export truncated_normal_expectation, compute_expected_T_tilde, compute_expected_T_tilde_stable, mills_ratio
 
 # there is some way to switch to views here which may speed things up
 
